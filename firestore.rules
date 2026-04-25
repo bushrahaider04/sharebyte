@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // Pillar 2: Validation Blueprints
+    function isValidDonor(data) {
+      return data.keys().hasAll(['name', 'location', 'userId']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             data.location is map &&
+             data.location.lat is number && data.location.lng is number;
+    }
+
+    match /donors/{donorId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(donorId) && isValidDonor(incoming());
+      allow update: if isSignedIn() && isValidDonor(incoming()) && (
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'address', 'location', 'contact'])
+      );
+    }
+
+    function isValidRecipient(data) {
+      return data.keys().hasAll(['name', 'location', 'userId']) &&
+             data.userId == request.auth.uid &&
+             data.location is map &&
+             data.location.lat is number && data.location.lng is number;
+    }
+
+    match /recipients/{recipientId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(recipientId) && isValidRecipient(incoming());
+      allow update: if isSignedIn() && isValidRecipient(incoming()) && (
+        incoming().userId == existing().userId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'address', 'location', 'needs'])
+      );
+    }
+
+    function isValidDonation(data) {
+      return data.keys().hasAll(['donorId', 'foodType', 'quantity', 'expirationDate', 'status', 'createdAt', 'location']) &&
+             data.status in ['available', 'matched', 'delivered'] &&
+             data.foodType is string && data.foodType.size() <= 200 &&
+             data.quantity is string && data.quantity.size() <= 100 &&
+             data.donorId is string &&
+             data.createdAt is string &&
+             data.location is map;
+    }
+
+    match /donations/{donationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(donationId) && isValidDonation(incoming()) &&
+                    exists(/databases/$(database)/documents/donors/$(incoming().donorId)) &&
+                    get(/databases/$(database)/documents/donors/$(incoming().donorId)).data.userId == request.auth.uid;
+      
+      allow update: if isSignedIn() && isValidDonation(incoming()) && (
+        // Action: Owner Update
+        (get(/databases/$(database)/documents/donors/$(existing().donorId)).data.userId == request.auth.uid &&
+         incoming().donorId == existing().donorId &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['foodType', 'quantity', 'expirationDate', 'status'])) ||
+        // Action: External Match Update (Only allow changing status to 'matched')
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status']) && existing().status == 'available')
+      );
+    }
+
+    function isValidMatch(data) {
+      return data.keys().hasAll(['donationId', 'recipientId', 'score', 'status', 'createdAt', 'reason']) &&
+             data.status in ['pending', 'accepted', 'rejected'] &&
+             data.score is number &&
+             data.donationId is string &&
+             data.recipientId is string;
+    }
+
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        isValidMatch(incoming()) &&
+        exists(/databases/$(database)/documents/donations/$(incoming().donationId)) &&
+        exists(/databases/$(database)/documents/recipients/$(incoming().recipientId))
+      );
+      
+      allow update: if isSignedIn() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      );
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "Donor": {
+      "title": "Donor",
+      "description": "A food donor (restaurant, grocer, etc.)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "location": { "type": "object" },
+        "contact": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["name", "location", "userId"]
+    },
+    "Recipient": {
+      "title": "Recipient",
+      "description": "A food recipient (charity, food bank, shelter)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "location": { "type": "object" },
+        "needs": { "type": "array", "items": { "type": "string" } },
+        "userId": { "type": "string" }
+      },
+      "required": ["name", "location", "userId"]
+    },
+    "Donation": {
+      "title": "Donation",
+      "description": "Surplus food items available for redistribution",
+      "type": "object",
+      "properties": {
+        "donorId": { "type": "string" },
+        "foodType": { "type": "string" },
+        "quantity": { "type": "string" },
+        "expirationDate": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["available", "matched", "delivered"] },
+        "location": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["donorId", "foodType", "quantity", "expirationDate", "status"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A suggested match between a donation and a recipient",
+      "type": "object",
+      "properties": {
+        "donationId": { "type": "string" },
+        "recipientId": { "type": "string" },
+        "score": { "type": "number" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["donationId", "recipientId", "score", "status"]
+    }
+  },
+  "firestore": {
+    "/donors/{donorId}": { "schema": "Donor", "description": "Collection of food donors" },
+    "/recipients/{recipientId}": { "schema": "Recipient", "description": "Collection of food recipients" },
+    "/donations/{donationId}": { "schema": "Donation", "description": "Collection of surplus food items" },
+    "/matches/{matchId}": { "schema": "Match", "description": "Collection of AI-generated matches" }
+  }
+}

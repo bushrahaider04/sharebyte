@@ -1,0 +1,12 @@
+{
+  "name": "FoodBridge AI",
+  "description": "An AI-powered real-time surplus food redistribution platform connecting restaurants and grocers with local charities to reduce waste and fight hunger.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "AI-powered matching",
+    "Real-time food alerts",
+    "Impact analytics"
+  ]
+}
